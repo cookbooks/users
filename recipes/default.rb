@@ -1,77 +1,71 @@
-node[:groups].each do |group_key, config|
-  group group_key do
-    group_name group_key.to_s
-    gid config[:gid]
-    action [:create, :manage]
+groups = search(:groups)
+
+groups.each do |group|
+  group group[:id] do
+    group_name group[:id]
+    gid group[:gid]
+    action [ :create, :modify, :manage ]
   end
-end
 
-if node[:active_users]
-  node[:active_users].each do |username|
-    config = node[:users][username]
-    user username do
-      comment config[:comment]
-      uid config[:uid]
-      gid config[:groups].first
-      home "/home/#{username}"
-      shell "/bin/bash"
-      password config[:password]
-      supports :manage_home => true
-      action [:create, :manage]
-    end  
-  end
-end
-
-node[:active_groups].each do |group_name, config|
-  users = node[:users].find_all { |u| u.last[:groups].include?(group_name) }
-
-  users.each do |u, config|
-    user u do
-      comment config[:comment]
-      uid config[:uid]
-      gid config[:groups].first
-      home "/home/#{u}"
-      shell "/bin/bash"
-      password config[:password]
-      supports :manage_home => true
-      action [:create, :manage]
-    end
-
-    config[:groups].each do |g|
-      group g do
-        group_name g.to_s
-        gid node[:groups][g][:gid]
-        members [ u ]
-        append true
-        action [:modify]
+  if node[:active_groups].include?(group[:id])
+    search(:users, "groups:#{group[:id]}").each do |user|
+      user user[:id] do
+        comment user[:comment]
+        uid user[:uid]
+        gid user[:groups].first
+        home "/home/#{user[:id]}"
+        shell "/bin/bash"
+        password user[:password]
+        supports :manage_home => true
+        action [:create, :manage]
       end
-    end    
-    
-    remote_file "/home/#{u}/.profile" do
-      source "users/#{u}/.profile"
-      mode 0750
-      owner u
-      group config[:groups].first.to_s
-    end
-    
-    directory "/home/#{u}/.ssh" do
-      action :create
-      owner u
-      group config[:groups].first.to_s
-      mode 0700
-    end
-    
-    add_keys u do
-      conf config
+      
+      user[:groups].each do |g|
+        group g do
+          group_name g.to_s
+          gid group[:gid]
+          members [user[:id]]
+          append true
+          action [ :create, :modify, :manage ]
+        end
+      end
+
+      directory "/home/#{user[:id]}/.ssh" do
+        action :create
+        owner user[:id]
+        group user[:groups].first.to_s
+        mode 0700
+      end
+
+      keys = Mash.new
+      keys[user[:id]] = user[:ssh_key]
+
+      if user[:ssh_key_groups]
+        user[:ssh_key_groups].each do |group|
+          users = search(:users, "groups:#{group}")
+          users.each do |key_user|
+            keys[key_user[:id]] = key_user[:ssh_key]
+          end
+        end
+      end
+      
+      if user[:extra_ssh_keys]
+        user[:extra_ssh_keys].each do |username|
+          keys[username] = search(:users, "id:#{username}").first[:ssh_key]
+        end
+      end
+
+      template "/home/#{user[:id]}/.ssh/authorized_keys" do
+        source "authorized_keys.erb"
+        action :create
+        owner user[:id]
+        group user[:groups].first.to_s
+        variables(:keys => keys)
+        mode 0600
+        not_if { user[:preserve_keys] }
+      end
     end
   end
-  
-  # remove users who may have been added but are now restricted from this node's role
-  # (node[:users] - users).each do |u|
-  #   user u do
-  #     action :remove
-  #   end
-  # end
 end
 
 # Remove initial setup user and group.
@@ -81,11 +75,4 @@ end
 
 group "ubuntu" do
   action :remove
-end
-
-directory "/u" do
-  action :create
-  owner "root"
-  group "admin"
-  mode 0775
 end
