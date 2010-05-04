@@ -18,21 +18,28 @@ groups.each do |group|
         home home_dir
         shell "/bin/bash"
         password user[:password]
-        supports :manage_home => true
+        supports :manage_home => false
         action [:create, :manage]
       end
       
       user[:groups].each do |g|
         group g do
           group_name g.to_s
-          gid group[:gid]
+          gid groups.find { |grp| grp[:id] == g }[:gid]
           members [user[:id]]
           append true
           action [ :create, :modify, :manage ]
         end
       end
 
-      if File.exists?(home_dir) && node[:users][:manage_files]
+      if (node[:users][:manage_files] || user[:local_files] == true) && File.exists?(home_dir)
+
+        directory "#{home_dir}" do
+          owner user[:id]
+          group user[:groups].first.to_s
+          mode 0700
+        end
+
         directory "#{home_dir}/.ssh" do
           action :create
           owner user[:id]
