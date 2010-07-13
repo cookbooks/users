@@ -1,3 +1,5 @@
+require_recipe 'ruby-shadow'
+
 groups = search(:groups)
 
 groups.each do |group|
@@ -10,13 +12,12 @@ groups.each do |group|
   if node[:active_groups].include?(group[:id])
     search(:users, "groups:#{group[:id]}").each do |user|
       home_dir = user[:home_dir] || "/home/#{user[:id]}"
-
       user user[:id] do
         comment user[:full_name]
         uid user[:uid]
         gid user[:groups].first
         home home_dir
-        shell "/bin/bash"
+        shell user[:shell] || "/bin/bash"
         password user[:password]
         supports :manage_home => false
         action [:create, :manage]
@@ -32,12 +33,12 @@ groups.each do |group|
         end
       end
 
-      if (node[:users][:manage_files] || user[:local_files] == true) && File.exists?(home_dir)
-
+      if (node[:users][:manage_files] || user[:local_files] == true)
         directory "#{home_dir}" do
           owner user[:id]
           group user[:groups].first.to_s
           mode 0700
+          recursive true
         end
 
         directory "#{home_dir}/.ssh" do
@@ -75,7 +76,9 @@ groups.each do |group|
           not_if { user[:preserve_keys] }
         end
       else
-        log "Not managing files for #{user[:id]} because home directory does not exist or this is not a management host."
+        log "Not managing files for #{user[:id]} because home directory does not exist or this is not a management host." do
+          level :debug
+        end
       end
     end
   end
