@@ -26,37 +26,14 @@ when "amazon"
   adduser_cmd = 'useradd'
 end
 
-search(:users) { | u |
-  name = u['name']
-  comment = u['comment']
-  create_home = u['create_home'] || node[:users][:create_home]
-  groups = u['groups'] || node[:users][:groups]
-  home_dir = u['home_dir']
-  # password = u['password']
-  shell = u['shell'] || node[:users][:shell]
-  user_group = u['user_group'] | node[:users][:user_group]
-  
-  options = []
-  options << "--comment '#{comment}'" unless comment.nil?
-  options << "--create-home" if create_home
-  options << "--groups '#{groups}'" unless groups.nil?
-  options << "--home '#{home_dir}'" unless home_dir.nil?
-  # options << "--password '#{password}'" unless password.nil?
-  options << "--shell '#{shell}'" unless shell.nil?
-  options << "--user-group" if user_group
-  
-  bash "add user" do
-    user "root"
-    code "#{adduser_cmd} #{name} #{options.join(' ')}"
-  end
-
-  # this instead of the above?
-  # user u['id'] do
-  #   uid u['uid']
-  #   gid u['gid']
-  #   shell u['shell']
-  #   comment u['comment']
-  #   supports :manage_home => true
-  #   home home_dir
-  # end
+node[:users].each { | u |
+  user u['id'] do
+    comment u['comment']
+    uid u['uid']
+    gid u['gid']
+    home u['home']
+    shell u['shell']
+    password u['password']
+    supports :manage_home => true
+  end  
 }
