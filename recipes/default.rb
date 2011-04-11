@@ -26,7 +26,7 @@ when "amazon"
   adduser_cmd = 'useradd'
 end
 
-node[:users].each { | u |
+node[:users].each do | u |
   user u['id'] do
     comment u['comment']
     uid u['uid']
@@ -35,5 +35,28 @@ node[:users].each { | u |
     shell u['shell']
     password u['password']
     supports :manage_home => true
-  end  
-}
+  end
+
+  u['groups'].each do | g |
+    group g do
+      members [ u['id'] ]
+      append true
+    end
+  end
+  
+  home_dir = "/home/#{u['id']}"
+
+  directory "#{home_dir}/.ssh" do
+    owner u['id']
+    group u['gid'] || u['id']
+    mode "0700"
+  end
+
+  template "#{home_dir}/.ssh/authorized_keys" do
+    source "authorized_keys.erb"
+    owner u['id']
+    group u['gid'] || u['id']
+    mode "0600"
+    variables :ssh_keys => u['ssh_keys']
+  end
+end
