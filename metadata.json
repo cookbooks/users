@@ -24,6 +24,7 @@
   "groupings": {
   },
   "recipes": {
+    "users": "reads users data bag and creates users",
     "users::sysadmin": "searches users data bag for sysadmins and creates users"
   },
   "version": "0.3.1"
