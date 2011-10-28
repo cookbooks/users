@@ -26,7 +26,7 @@
 #   adduser_cmd = 'useradd'
 # end
 
-node[:users].each do | u |
+search(:users) do | u |
   create_user u['id'] do
     details u
   end
