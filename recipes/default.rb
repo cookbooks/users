@@ -26,7 +26,8 @@
 #   adduser_cmd = 'useradd'
 # end
 
-search(:users) do | u |
+data_bag('users').each do |username|
+  u = data_bag_item('users', username)
   create_user u['id'] do
     details u
   end
